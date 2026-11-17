@@ -1,0 +1,140 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # 1. Build & Test Job (runs on PRs, main, tags)
+  # ----------------------------------------------------------------------------
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run check
+
+      - name: Run Tests
+        run: npm test
+
+  # ----------------------------------------------------------------------------
+  # 2. CI AI Review Job (runs only on Pull Requests)
+  # ----------------------------------------------------------------------------
+  ai-review:
+    name: CI AI Review
+    needs: [build-and-test]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run AI Review
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          TARGET_BASE: origin/${{ github.base_ref }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LLM_PROXY_BASE_URL: ${{ secrets.LLM_PROXY_BASE_URL }}
+          LLM_PROXY_API_KEY: ${{ secrets.LLM_PROXY_API_KEY }}
+        run: node scripts/ai-pr-review.mjs
+
+  # ----------------------------------------------------------------------------
+  # 3. Docker Build & Push to GHCR (runs on main branch and release tags)
+  # ----------------------------------------------------------------------------
+  docker-build-push:
+    name: Build & Push Docker Image (GHCR)
+    needs: [build-and-test]
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,prefix=sha-,format=short,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ----------------------------------------------------------------------------
+  # 4. Cleanup GHCR Images (runs on main push, retains latest 3 versions)
+  # ----------------------------------------------------------------------------
+  cleanup-ghcr:
+    name: Cleanup Old GHCR Images
+    needs: [docker-build-push]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Delete older images (keep latest 3)
+        uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: 'space-game'
+          package-type: 'container'
+          min-versions-to-keep: 3
+          ignore-versions: '^v[0-9]+'
