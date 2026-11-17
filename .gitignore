@@ -1,0 +1,13 @@
+# Ignore dev/local environment
+.env
+.devcontainer/.env
+
+# Node & dependencies
+node_modules/
+dist/
+coverage/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+*.log
