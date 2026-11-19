@@ -44,7 +44,7 @@ jobs:
   # 2. CI AI Review Job (runs only on Pull Requests)
   # ----------------------------------------------------------------------------
   ai-review:
-    name: CI AI Review
+    name: CI AI Review (Pi)
     needs: [build-and-test]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -62,7 +62,10 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run AI Review
+      - name: Install Pi Coding Agent CLI
+        run: npm install -g @earendil-works/pi-coding-agent
+
+      - name: Run CI Review via Pi
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           TARGET_BASE: origin/${{ github.base_ref }}
@@ -71,7 +74,43 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           LLM_PROXY_BASE_URL: ${{ secrets.LLM_PROXY_BASE_URL }}
           LLM_PROXY_API_KEY: ${{ secrets.LLM_PROXY_API_KEY }}
-        run: node scripts/ai-pr-review.mjs
+        run: |
+          # Check whether any LLM credential is present; if not, skip gracefully
+          if [ -z "$LLM_PROXY_BASE_URL" ] && [ -z "$LLM_PROXY_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "ℹ️  No AI credentials configured in GitHub secrets. Skipping CI Pi review."
+            exit 0
+          fi
+
+          echo "🚀 Generating diff against $TARGET_BASE..."
+          DIFF_FILE=$(mktemp)
+          git diff "${TARGET_BASE}...HEAD" > "$DIFF_FILE"
+
+          if [ ! -s "$DIFF_FILE" ]; then
+            echo "ℹ️  Empty diff. Skipping review."
+            exit 0
+          fi
+
+          echo "🤖 Running Pi Review..."
+          REVIEW_OUTPUT=$(pi --print \
+            "You are a specialized code reviewer for space-game (turn-based multiplayer space strategy in TypeScript).
+             Review this pull request diff from file: $DIFF_FILE
+             Evaluate:
+             1. Determinism: Ensure zero Math.random() calls (seedable PRNG only) and state immutability.
+             2. Architecture & ADR alignment in /docs/architecture/ and /docs/decisions/.
+             3. Strict TypeScript safety, edge case handling, and test coverage.
+             Format output with: Summary, Key Findings, Suggestions, Verdict ([APPROVE] or [REQUEST CHANGES])." 2>&1) || true
+
+          echo "$REVIEW_OUTPUT"
+
+          if [ -n "$PR_NUMBER" ] && [ -n "$REVIEW_OUTPUT" ]; then
+            echo "Posting review to PR #$PR_NUMBER..."
+            COMMENT="### 🤖 CI Pi Agent Review
+
+          $REVIEW_OUTPUT
+
+          *Automated review executed with Pi coding agent CLI in CI pipeline.*"
+            gh pr comment "$PR_NUMBER" --body "$COMMENT" || true
+          fi
 
   # ----------------------------------------------------------------------------
   # 3. Docker Build & Push to GHCR (runs on main branch and release tags)

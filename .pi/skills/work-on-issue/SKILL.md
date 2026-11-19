@@ -63,6 +63,20 @@ Implements a GitHub issue end-to-end adhering to project rules, testing standard
      ```
    - If any test fails, analyze and fix until 100% green. Do not proceed until tests pass.
 
+### Phase 3.5: Pre-PR Local Self-Review
+Before creating a PR, perform an autonomous self-review against project standards:
+1. Inspect the full diff against base:
+   ```bash
+   git diff origin/main...HEAD
+   ```
+2. Self-review checklist:
+   - **Determinism**: Zero calls to `Math.random()` or non-deterministic APIs. All randomness must use seedable PRNGs. State transitions must be pure and immutable.
+   - **Architectural Alignment**: Verified against `/docs/architecture/` and ADRs in `/docs/decisions/`.
+   - **Strict Types**: No unsafe `any` casts or unhandled null/undefined values.
+   - **Test Coverage**: All newly introduced branches, edge cases, and acceptance criteria have corresponding automated tests.
+   - **Commit Cleanliness**: Commits follow Angular Conventional Commit conventions.
+3. If any gaps or defects are identified, fix them and rerun `npm test` before continuing.
+
 ### Phase 4: Commit & Pull Request
 1. Commit changes with conventional commits:
    ```bash
@@ -82,12 +96,18 @@ Implements a GitHub issue end-to-end adhering to project rules, testing standard
      ### Summary
      - <bullet points of changes>
 
+     ### Pre-PR Local Self-Review
+     - [x] Determinism verified (no Math.random, seedable PRNG, pure state transitions)
+     - [x] Architectural compliance with /docs/architecture & ADRs
+     - [x] TypeScript strictness & test coverage complete
+
      ### Verification
      - Unit tests added: `<test files>`
      - Local test run result: `npm test` passing cleanly.
 
      ### Review Mode
      - [ ] Needs Human Review (checked if issue requested human review)
+     - [x] Pre-PR Local Review Completed
      - [x] AI CI Review Ready
      ```
 4. Create PR via GitHub CLI:
