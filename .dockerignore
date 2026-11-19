@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.github
+.devcontainer
+.pi
+.githooks
+docs
+*.log
+.env*

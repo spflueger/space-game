@@ -1,0 +1,14 @@
+{
+  "name": "space-game",
+  "dockerComposeFile": "compose.yaml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/space-game",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "26.13.1"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "npm install -g @earendil-works/pi-coding-agent@1.5.2",
+  "postStartCommand": "if [ -n \"$GIT_USER_EMAIL\" ] || [ -n \"$GIT_AUTHOR_EMAIL\" ]; then git config --global user.email \"${GIT_USER_EMAIL:-$GIT_AUTHOR_EMAIL}\"; fi && if [ -n \"$GIT_USER_NAME\" ] || [ -n \"$GIT_AUTHOR_NAME\" ]; then git config --global user.name \"${GIT_USER_NAME:-$GIT_AUTHOR_NAME}\"; fi"
+}

@@ -1,0 +1,8 @@
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/base:ubuntu26.04
+    env_file:
+      - .env
+    volumes:
+      - ..:/workspaces/space-game
+    command: sleep infinity
