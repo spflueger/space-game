@@ -91,7 +91,7 @@ jobs:
           fi
 
           echo "🤖 Running Pi Review..."
-          REVIEW_OUTPUT=$(pi --print \
+          REVIEW_OUTPUT=$(pi --approve --no-session --tools read --print \
             "You are a specialized code reviewer for space-game (turn-based multiplayer space strategy in TypeScript).
              Review this pull request diff from file: $DIFF_FILE
              Evaluate:
