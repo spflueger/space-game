@@ -106,10 +106,16 @@ jobs:
             echo "Posting review to PR #$PR_NUMBER..."
             COMMENT="### 🤖 CI Pi Agent Review
 
-          $REVIEW_OUTPUT
+$REVIEW_OUTPUT
 
-          *Automated review executed with Pi coding agent CLI in CI pipeline.*"
+*Automated review executed with Pi coding agent CLI in CI pipeline.*"
             gh pr comment "$PR_NUMBER" --body "$COMMENT" || true
+          fi
+
+          # Gate PR: If Pi requested changes, fail the status check to block merge
+          if echo "$REVIEW_OUTPUT" | grep -qi "\[REQUEST CHANGES\]"; then
+            echo "❌ CI AI Review requested changes. Merge blocked until issues are resolved."
+            exit 1
           fi
 
   # ----------------------------------------------------------------------------
