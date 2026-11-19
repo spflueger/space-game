@@ -63,7 +63,7 @@ jobs:
           node-version: 22
 
       - name: Install Pi Coding Agent CLI
-        run: npm install -g @earendil-works/pi-coding-agent
+        run: npm install -g @earendil-works/pi-coding-agent@1.5.2
 
       - name: Run CI Review via Pi
         env:
